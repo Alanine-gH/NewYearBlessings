@@ -1,0 +1,108 @@
+spring:
+  # 数据源配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL:jdbc:mysql://localhost:3306/newyear_blessing?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${DB_USER:your_username}
+    password: ${DB_PASSWORD:your_password}
+  # 禁用数据库初始化依赖检测，解决MyBatis Plus与Spring Boot 3兼容性问题
+  sql:
+    init:
+      mode: never
+      continue-on-error: true
+  # 文件上传配置
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+
+# MyBatis Plus配置
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.NewYearBlessings.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# MinIO配置
+minio:
+  endpoint: ${MINIO_ENDPOINT:localhost}
+  port: ${MINIO_PORT:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  secure: ${MINIO_SECURE:false}
+  bucket-name: ${MINIO_BUCKET_NAME:newyearblessings}
+  download-dir: ${MINIO_DOWNLOAD_DIR:/data/images}
+
+# 项目配置
+newyear-blessings:
+  # DeepSeek API配置
+  deepseek:
+    api-key: ${DEEPSEEK_API_KEY:your_api_key}
+    base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com/v1}
+    timeout: ${DEEPSEEK_TIMEOUT:5000ms}
+    emotion-threshold: ${DEEPSEEK_EMOTION_THRESHOLD:60}
+  # 图片配置
+  image:
+    max-size: 5242880
+    allowed-formats: jpg,png,webp
+  # 祝福配置
+  blessing:
+    min-length: 1
+    max-length: 200
+  # 限流配置
+  rate-limit:
+    per-minute: 10
+  # 缓存配置
+  cache:
+    expire-seconds: 3600
+  # 热门城市配置
+  hot-city:
+    rank-limit: 10
+  # 高德地图配置
+  amap:
+    key: ${AMAP_KEY:your_key}
+    security-js-code: ${AMAP_SECURITY_JS_CODE:<your_security_js_code>}
+    callback: ${AMAP_CALLBACK:amapInitCallback}
+
+
+# 日志配置
+logging:
+  level:
+    com.NewYearBlessings: debug
+    org.springframework.web: info
+    com.baomidou.mybatisplus: debug
+
+# 服务器配置
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /api
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  # HTTPS配置
+  ssl:
+    enabled: ${HTTPS_ENABLED:false}
+    key-store: ${HTTPS_KEY_STORE:classpath:keystore.p12}
+    key-store-type: ${HTTPS_KEY_STORE_TYPE:PKCS12}
+    key-store-password: ${HTTPS_KEY_STORE_PASSWORD:changeit}
+    key-alias: ${HTTPS_KEY_ALIAS:tomcat}
+  tomcat:
+    connection-timeout: 30000ms
+    max-http-form-post-size: 10485760
+    threads:
+      max: 200
+      min-spare: 10
+
+# OpenAPI配置
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
