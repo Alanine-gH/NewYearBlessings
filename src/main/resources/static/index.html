@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>祝福点亮中国地图</title>
+    <!-- 动态加载高德地图JSAPI -->
+    <script type="text/javascript">
+        // 高德地图加载完成后的回调函数
+        window.onAMapLoaded = function () {
+        };
+
+        // 监听地图API加载状态
+        function amapInitCallback() {
+            if (window.onAMapLoaded && typeof window.onAMapLoaded === 'function') {
+                window.onAMapLoaded();
+            }
+        }
+        
+        // 从后端获取高德地图配置并加载地图API
+        async function loadAmapConfig() {
+            try {
+                const response = await fetch('/api/common/config/amap');
+                const result = await response.json();
+                if (result.code === 1 && result.data) {
+                    const config = result.data;
+                    
+                    // 设置安全密钥
+                    window._AMapSecurityConfig = {
+                        securityJsCode: config.securityJsCode
+                    };
+                    
+                    // 动态创建地图API脚本标签
+                    const script = document.createElement('script');
+                    script.type = 'text/javascript';
+                    script.src = `https://webapi.amap.com/maps?v=2.0&key=${config.key}&callback=amapInitCallback`;
+                    document.head.appendChild(script);
+                } else {
+                    console.error('获取高德地图配置失败:', result.msg);
+                }
+            } catch (error) {
+                console.error('获取高德地图配置出错:', error);
+            }
+        }
+        
+        // 页面加载完成后获取配置并加载地图
+        document.addEventListener('DOMContentLoaded', loadAmapConfig);
+    </script>
+    <!-- 引入ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <!-- 引入样式 -->
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* 左侧地图区域 */
+        .map-area {
+            flex: 1;
+            position: relative;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 右侧表单区域 */
+        .form-area {
+            width: 400px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px 30px;
+            box-shadow: -5px 0 25px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+        }
+
+        .form-title {
+            text-align: center;
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 30px;
+            font-weight: bold;
+        }
+
+        /* 表单样式 */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: #fff;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        /* 图片上传 */
+        .image-upload {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fafafa;
+        }
+
+        .image-upload:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .image-upload input {
+            display: none;
+        }
+
+        .image-upload-label {
+            display: block;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .upload-icon {
+            font-size: 36px;
+            color: #999;
+            margin-bottom: 10px;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* 提交按钮 */
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+
+        /* 提示信息 */
+        .alert {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        /* 城市信息面板 */
+        .city-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            max-width: 300px;
+            z-index: 1000;
+        }
+
+        .city-info h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .blessing-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .blessing-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        .blessing-item:last-child {
+            border-bottom: none;
+        }
+
+        .blessing-content {
+            color: #555;
+            margin-bottom: 5px;
+        }
+
+        .blessing-time {
+            color: #999;
+            font-size: 12px;
+        }
+
+        /* 加载动画 */
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px 40px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            z-index: 9999;
+            display: none;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .form-area {
+                width: 100%;
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+<!-- 加载动画 -->
+<div class="loading" id="loading">
+    加载中...
+</div>
+
+<div class="container">
+    <!-- 左侧地图区域 -->
+    <div class="map-area">
+        <!-- 城市信息面板 -->
+        <div class="city-info" id="cityInfo" style="display: none;">
+            <h3 id="cityName">城市名称</h3>
+            <div class="blessing-list" id="blessingList">
+                <!-- 祝福列表 -->
+            </div>
+        </div>
+
+        <!-- 地图容器 -->
+        <div id="map"></div>
+    </div>
+
+    <!-- 右侧表单区域 -->
+    <div class="form-area">
+        <h2 class="form-title">🌟 祝福点亮中国 🌟</h2>
+
+        <!-- 提示信息 -->
+        <div id="alert" class="alert" style="display: none;"></div>
+
+        <form id="blessingForm">
+            <div class="form-group">
+                <label for="nickname">昵称</label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="text" id="nickname" name="nickname" class="form-control" placeholder="请输入您的昵称"
+                           value="Alanine" style="flex: 1;">
+                    <span id="locationCity" style="font-size: 14px; color: #666;">正在定位...</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="city">所在城市</label>
+                <input type="text" id="city" name="city" class="form-control" placeholder="请输入您所在的城市" required>
+            </div>
+
+            <div class="form-group">
+                <label for="content">祝福语</label>
+                <textarea id="content" name="content" class="form-control" placeholder="请输入您的新年祝福（1-200字）"
+                          required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>上传2025精彩瞬间</label>
+                <div class="image-upload" id="imageUpload">
+                    <input type="file" id="imageFile" name="image" accept="image/*">
+                    <div class="upload-icon">📸</div>
+                    <div class="upload-text">点击或拖拽上传图片</div>
+                    <div id="imagePreview" style="margin-top: 10px; display: none;"></div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit">提交祝福</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // 初始化ECharts实例
+    let myChart = null;
+    let mapData = null;
+    let userCity = null;
+
+    // 显示提示信息
+    function showAlert(message, type = 'info') {
+        const alert = document.getElementById('alert');
+        alert.className = `alert alert-${type}`;
+        alert.textContent = message;
+        alert.style.display = 'block';
+
+        setTimeout(() => {
+            alert.style.display = 'none';
+        }, 3000);
+    }
+
+    // 显示加载动画
+    function showLoading() {
+        document.getElementById('loading').classList.add('show');
+    }
+
+    // 隐藏加载动画
+    function hideLoading() {
+        document.getElementById('loading').classList.remove('show');
+    }
+
+    // 获取中国地图数据
+    async function getMapData() {
+        showLoading();
+        try {
+            // 1. 获取地图地理数据
+            const mapResponse = await fetch('/api/map/china');
+            const mapResult = await mapResponse.json();
+            if (mapResult.code !== 1) {
+                showAlert('获取地图数据失败', 'error');
+                hideLoading();
+                return;
+            }
+            mapData = mapResult.data;
+
+            // 2. 获取城市祝福统计数据
+            const statsResponse = await fetch('/api/blessing/city-stats');
+            const statsResult = await statsResponse.json();
+            let cityStats = [];
+            if (statsResult.code === 1 && statsResult.data) {
+                cityStats = statsResult.data;
+            }
+
+            // 3. 初始化地图
+            initMap(cityStats);
+        } catch (error) {
+            console.error('获取地图数据失败:', error);
+            showAlert('获取地图数据失败', 'error');
+        } finally {
+            hideLoading();
+        }
+    }
+
+    // 初始化地图
+    function initMap(cityStats) {
+        if (!mapData) return;
+
+        // 注册地图
+        echarts.registerMap('china', mapData);
+
+        // 计算最大值用于visualMap
+        let maxValue = 0;
+        if (cityStats && cityStats.length > 0) {
+            maxValue = Math.max(...cityStats.map(item => item.value || 0));
+        }
+        maxValue = Math.max(maxValue, 10); // 至少为10
+
+        // 地图配置
+        const option = {
+            tooltip: {
+                formatter: function (params) {
+                    if (params.componentSubType === 'map') {
+                        return params.name + '\n祝福数: ' + (params.value || 0);
+                    }
+                    return params.name;
+                }
+            },
+            visualMap: {
+                type: 'continuous',
+                min: 0,
+                max: maxValue,
+                left: 'left',
+                top: 'bottom',
+                text: ['多', '少'],
+                calculable: true,
+                inRange: {
+                    color: ['#f0f9e8', '#bae701', '#ffd700', '#ff8c00', '#ff6b6b']
+                }
+            },
+            series: [{
+                name: '祝福数量',
+                type: 'map',
+                map: 'china',
+                roam: true,
+                emphasis: {
+                    label: {
+                        show: true
+                    },
+                    itemStyle: {
+                        areaColor: '#ffd700'
+                    }
+                },
+                select: {
+                    label: {
+                        show: true
+                    },
+                    itemStyle: {
+                        areaColor: '#ff8c00'
+                    }
+                },
+                data: cityStats || []
+            }]
+        };
+
+        // 设置地图配置
+        myChart.setOption(option);
+
+        // 绑定地图点击事件
+        myChart.on('click', function (params) {
+            // 显示城市信息
+            if (params.name) {
+                showCityInfo(params.name);
+            }
+        });
+    }
+
+    // 显示城市信息
+    async function showCityInfo(cityName) {
+        const cityInfo = document.getElementById('cityInfo');
+        const cityNameEl = document.getElementById('cityName');
+        const blessingList = document.getElementById('blessingList');
+
+        cityNameEl.textContent = cityName;
+        cityInfo.style.display = 'block';
+
+        // 获取城市祝福列表
+        blessingList.innerHTML = '<div style="text-align: center; color: #999;">加载中...</div>';
+
+        try {
+            const response = await fetch(`/api/blessing/city/${encodeURIComponent(cityName)}?page=1&size=5`);
+            const result = await response.json();
+            if (result.code === 1) {
+                const blessings = result.data;
+                if (blessings && blessings.length > 0) {
+                    blessingList.innerHTML = blessings.map(blessing => `
+                            <div class="blessing-item">
+                                <div class="blessing-content">${blessing.blessingContent}</div>
+                                <div class="blessing-time">${new Date(blessing.submitTime).toLocaleString()}</div>
+                            </div>
+                        `).join('');
+                } else {
+                    blessingList.innerHTML = '<div style="text-align: center; color: #999;">暂无祝福</div>';
+                }
+            } else {
+                blessingList.innerHTML = '<div style="text-align: center; color: #999;">获取祝福失败</div>';
+            }
+        } catch (error) {
+            console.error('获取祝福列表失败:', error);
+            blessingList.innerHTML = '<div style="text-align: center; color: #999;">获取祝福失败</div>';
+        }
+    }
+
+    // 快速定位 - 使用IP定位
+    function getUserLocation() {
+        const locationCityEl = document.getElementById('locationCity');
+        const cityInput = document.getElementById('city');
+        
+        // 先尝试GPS定位
+        if ('geolocation' in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                function (position) {
+                    const {latitude, longitude} = position.coords;
+                    console.log('获取到GPS坐标:', latitude, longitude);
+                    getCityFromBackend(longitude, latitude, locationCityEl, cityInput);
+                },
+                function (error) {
+                    console.error('GPS定位失败，尝试IP定位:', error.code);
+                    // GPS失败，使用IP定位
+                    getCityFromIP(locationCityEl, cityInput);
+                },
+                { timeout: 3000, maximumAge: 0, enableHighAccuracy: true }
+            );
+        } else {
+            // 不支持GPS，使用IP定位
+            getCityFromIP(locationCityEl, cityInput);
+        }
+    }
+
+    // 通过后端获取城市（GPS坐标）
+    function getCityFromBackend(longitude, latitude, locationCityEl, cityInput) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+        fetch(`/api/map/city?longitude=${longitude}&latitude=${latitude}`, {signal: controller.signal})
+            .then(res => {
+                clearTimeout(timeoutId);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                console.log('后端返回数据:', data);
+                if (data.code === 1 && data.data) {
+                    const city = data.data;
+                    if (city) {
+                        locationCityEl.textContent = city;
+                        locationCityEl.style.color = '#28a745';
+                        cityInput.value = city;
+                        showAlert(`欢迎来自${city}的朋友！`, 'success');
+                        return;
+                    }
+                }
+                // 高德API失败，降级到IP定位
+                getCityFromIP(locationCityEl, cityInput);
+            })
+            .catch(err => {
+                clearTimeout(timeoutId);
+                console.error('GPS定位失败:', err.message);
+                // 降级到IP定位
+                getCityFromIP(locationCityEl, cityInput);
+            });
+    }
+
+    // 通过IP定位获取城市
+    function getCityFromIP(locationCityEl, cityInput) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+        // 使用免费的IP定位API
+        fetch('https://ipapi.co/json/', {signal: controller.signal})
+            .then(res => {
+                clearTimeout(timeoutId);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                console.log('IP定位返回数据:', data);
+                if (data.city) {
+                    const city = data.city;
+                    locationCityEl.textContent = city;
+                    locationCityEl.style.color = '#28a745';
+                    cityInput.value = city;
+                    showAlert(`欢迎来自${city}的朋友！`, 'success');
+                } else {
+                    throw new Error('无法获取城市信息');
+                }
+            })
+            .catch(err => {
+                clearTimeout(timeoutId);
+                console.error('IP定位失败:', err.message);
+                locationCityEl.textContent = '定位失败';
+                locationCityEl.style.color = '#dc3545';
+            });
+    }
+
+    // 图片上传预览
+    document.getElementById('imageUpload').addEventListener('click', function () {
+        document.getElementById('imageFile').click();
+    });
+
+    document.getElementById('imageFile').addEventListener('change', function (e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const preview = document.getElementById('imagePreview');
+                preview.innerHTML = `<img src="${e.target.result}" style="max-width: 100%; max-height: 200px; border-radius: 8px;">`;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // 表单提交
+    document.getElementById('blessingForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        // 获取隐藏输入框中的城市值
+        const city = document.getElementById('city').value;
+
+        // 验证城市是否已定位
+        if (!city || city === '' || city === '定位失败') {
+            showAlert('请先完成城市定位', 'error');
+            return;
+        }
+
+        showLoading();
+
+        try {
+            let imageName = null;
+
+            // 1. 上传图片（如果有）
+            const fileInput = document.getElementById('imageFile');
+            const file = fileInput.files[0];
+            if (file) {
+                // 检查文件大小（限制为5MB）
+                if (file.size > 5 * 1024 * 1024) {
+                    showAlert('图片大小不能超过5MB', 'error');
+                    return;
+                }
+
+                const uploadFormData = new FormData();
+                uploadFormData.append('file', file);
+
+                const uploadResponse = await fetch('/api/common/upload', {
+                    method: 'POST',
+                    body: uploadFormData
+                });
+
+                const uploadResult = await uploadResponse.json();
+                if (uploadResult.code === 1) {
+                    imageName = uploadResult.data;
+                    console.log('图片上传成功:', imageName);
+                } else {
+                    console.error('图片上传失败:', uploadResult.msg);
+                    throw new Error(uploadResult.msg || '图片上传失败');
+                }
+            }
+
+            // 2. 提交祝福
+            const submitData = {
+                nickname: document.getElementById('nickname').value,
+                blessingContent: document.getElementById('content').value,
+                city: city
+            };
+
+            // 如果有图片上传成功，添加图片名称到请求数据中
+            if (imageName) {
+                submitData.imageName = imageName;
+            }
+
+            const submitResponse = await fetch('/api/blessing/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(submitData)
+            });
+
+            const submitResult = await submitResponse.json();
+            if (submitResult.code === 1) {
+                showAlert('祝福提交成功！', 'success');
+
+                // 清空表单
+                document.getElementById('blessingForm').reset();
+                document.getElementById('imagePreview').style.display = 'none';
+
+                // 重新加载地图数据
+                getMapData();
+            } else {
+                showAlert(submitResult.msg, 'error');
+            }
+        } catch (error) {
+            console.error('提交祝福失败:', error);
+            showAlert('提交祝福失败', 'error');
+        } finally {
+            hideLoading();
+        }
+    });
+
+    // 初始化
+    window.onload = function () {
+        console.log('页面加载完成，开始初始化...');
+
+        // 等待高德地图API加载完成后初始化
+        if (typeof AMap !== 'undefined') {
+            // 高德地图已加载
+            initializeApp();
+        } else {
+            // 高德地图尚未加载，会通过回调函数触发初始化
+            console.log('等待高德地图API加载...');
+        }
+    };
+
+    // 当高德地图API加载完成时调用此函数
+    window.onAMapLoaded = function () {
+        console.log('高德地图API加载完成');
+        initializeApp();
+    };
+
+    // 应用初始化函数
+    function initializeApp() {
+        // 初始化ECharts实例
+        myChart = echarts.init(document.getElementById('map'));
+
+        // 获取地图数据
+        getMapData();
+
+        // 获取用户位置 - 确保调用定位函数
+        console.log('调用getUserLocation函数...');
+        getUserLocation();
+    }
+
+    // 窗口大小变化时，调整地图大小
+    window.addEventListener('resize', function () {
+        if (myChart) {
+            myChart.resize();
+        }
+    });
+
+    // 手动触发定位（用于测试）
+    function manualLocate() {
+        console.log('手动触发定位...');
+        getUserLocation();
+    }
+</script>
+</body>
+</html>
